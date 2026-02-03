@@ -357,7 +357,7 @@
         td:nth-child(3) {
             text-align: center;
         }
-        /* Training table: center the Range column (2nd col) like the Pace column above */
+        /* Training table: center the Range column and rep columns */
         
         #training th:nth-child(2),
         #training td:nth-child(2),
@@ -367,6 +367,18 @@
         #training td:nth-child(4),
         #training th:nth-child(5),
         #training td:nth-child(5) {
+            text-align: center;
+        }
+        /* Track table: center split columns (3rd+) */
+        
+        #track th:nth-child(3),
+        #track td:nth-child(3),
+        #track th:nth-child(4),
+        #track td:nth-child(4),
+        #track th:nth-child(5),
+        #track td:nth-child(5),
+        #track th:nth-child(6),
+        #track td:nth-child(6) {
             text-align: center;
         }
         
@@ -543,6 +555,20 @@
             </thead>
             <tbody></tbody>
         </table>
+
+        <table id="track" style="display: none; margin-top: 12px;">
+            <thead>
+                <tr>
+                    <th>Track effort</th>
+                    <th>Use</th>
+                    <th>Split range</th>
+                    <th>400m</th>
+                    <th>200m</th>
+                    <th>100m</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
     </div>
 
     <script src="scoring.js"></script>
@@ -552,6 +578,8 @@
             document.getElementById("time").value = "";
             document.getElementById("points").value = "";
             document.getElementById("results").style.display = "none";
+            document.getElementById("training").style.display = "none";
+            document.getElementById("track").style.display = "none";
 
             var s = document.getElementById("summary");
             s.style.display = "none";
@@ -764,6 +792,125 @@
             tbl.style.display = "table";
         }
 
+        function updateTrackPaces(points) {
+            var tbl = document.getElementById("track");
+            var body = document.querySelector("#track tbody");
+            body.innerHTML = "";
+
+            // Anchor events (same points value)
+            var tMile = findTime("mile", points);
+            var t800 = findTime("800m", points);
+            var t400 = findTime("400m", points);
+            var t200 = findTime("200m", points);
+            var t5k = findTime("5k", points);
+
+            var sMile = toSeconds(tMile);
+            var s800 = toSeconds(t800);
+            var s400 = toSeconds(t400);
+            var s200 = toSeconds(t200);
+            var s5k = toSeconds(t5k);
+
+            // If the table doesn't have an exact cell, findTime returns "-"; try a gentle fallback.
+            // We keep this transparent rather than magical.
+            if ((sMile == null || isNaN(sMile)) && (s800 != null && !isNaN(s800))) sMile = s800 * 2.25; // ~mile from 800
+            if ((s800 == null || isNaN(s800)) && (sMile != null && !isNaN(sMile))) s800 = sMile / 2.25;
+            if ((s400 == null || isNaN(s400)) && (s200 != null && !isNaN(s200))) s400 = s200 * 2.05;
+            if ((s200 == null || isNaN(s200)) && (s400 != null && !isNaN(s400))) s200 = s400 / 2.05;
+
+            function fmtRange(low, high) {
+                if (low == null || high == null || isNaN(low) || isNaN(high)) return "-";
+                return formatRepTime(low) + "–" + formatRepTime(high);
+            }
+
+            function splitSecPerMeter(totalSec, distMeters) {
+                if (totalSec == null || isNaN(totalSec) || !isFinite(totalSec)) return null;
+                return totalSec / distMeters;
+            }
+
+            function addRow(name, use, lowMult, highMult, spm) {
+                var tr = document.createElement("tr");
+
+                var a = document.createElement("td");
+                a.textContent = name;
+
+                var b = document.createElement("td");
+                b.textContent = use;
+
+                var c = document.createElement("td");
+                var d = document.createElement("td");
+                var e = document.createElement("td");
+                var f = document.createElement("td");
+
+                if (spm == null) {
+                    c.textContent = "-";
+                    d.textContent = "-";
+                    e.textContent = "-";
+                    f.textContent = "-";
+                } else {
+                    // Split range column anchored to 400m (most common track split unit)
+                    c.textContent = fmtRange(spm * 400 * lowMult, spm * 400 * highMult);
+                    d.textContent = fmtRange(spm * 400 * lowMult, spm * 400 * highMult);
+                    e.textContent = fmtRange(spm * 200 * lowMult, spm * 200 * highMult);
+                    f.textContent = fmtRange(spm * 100 * lowMult, spm * 100 * highMult);
+                }
+
+                tr.appendChild(a);
+                tr.appendChild(b);
+                tr.appendChild(c);
+                tr.appendChild(d);
+                tr.appendChild(e);
+                tr.appendChild(f);
+                body.appendChild(tr);
+            }
+
+            // 3k–5k-ish (track aerobic) — based on 5k pace
+            // addRow(
+            //     "3k–5k effort",
+            //     "Cruise reps (e.g., 6×1k, 12×400) / strength-endurance",
+            //     0.99,
+            //     1.03,
+            //     (s5k != null && !isNaN(s5k)) ? splitSecPerMeter(s5k, 5000) : null
+            // );
+
+            // Mile/1500 effort — based on mile pace
+            addRow(
+                "Mile / 1500 effort",
+                "Mile-focused reps (e.g., 8×400, 5×600, 3×800) w/ full-ish rest",
+                0.99,
+                1.02,
+                (sMile != null && !isNaN(sMile)) ? splitSecPerMeter(sMile, 1609.344) : null
+            );
+
+            // 800 effort — based on 800 pace
+            addRow(
+                "800 effort",
+                "Speed-endurance (e.g., 10×200, 6×300, 4×400) w/ generous rest",
+                0.985,
+                1.02,
+                (s800 != null && !isNaN(s800)) ? splitSecPerMeter(s800, 800) : null
+            );
+
+            // 400 effort — based on 400 pace
+            addRow(
+                "400 effort",
+                "Pure speed-endurance (e.g., 6–10×150, 4–8×200) w/ near-full recovery",
+                0.98,
+                1.03,
+                (s400 != null && !isNaN(s400)) ? splitSecPerMeter(s400, 400) : null
+            );
+
+            // Speed (200-ish) — based on 200 pace
+            addRow(
+                "Speed (200 / fast strides)",
+                "Neuromuscular speed: strides, flys, short hills (always relaxed)",
+                1.00,
+                1.08,
+                (s200 != null && !isNaN(s200)) ? splitSecPerMeter(s200, 200) : null
+            );
+
+            tbl.style.display = "table";
+        }
+
         function findPoints(event, timeSec) {
             var rows = scoring[event];
             var best = null;
@@ -865,6 +1012,8 @@
             document.getElementById("results").style.display = "table";
             // Render training pace ranges based on the same points value
             updateTrainingPaces(points);
+            // Render track-oriented split guidance based on the same points value
+            updateTrackPaces(points);
         }
 
         // Allow Enter/Return to trigger calculation (after functions are defined)
