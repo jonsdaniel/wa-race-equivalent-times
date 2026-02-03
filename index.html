@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Race Equivalent Calculator</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f4f4;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 600px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            margin-top: 20px;
+            width: 100%;
+        }
+        
+        td,
+        th {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        
+        button {
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+        
+        input,
+        select {
+            padding: 6px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Race Equivalent Calculator</h2>
+
+        <label>Distance:</label><br />
+        <select id="distance">
+      <option value="100m">100m</option>
+      <option value="200m">200m</option>
+      <option value="300m">300m</option>
+      <option value="400m">400m</option>
+      <option value="800m">800m</option>
+      <option value="mile">1 mile (road)</option>
+      <option value="5k">5 km (road)</option>
+      <option value="10k">10 km (road)</option>
+      <option value="hm">Half Marathon</option>
+      <option value="marathon">Marathon</option>
+    </select>
+
+        <br />
+
+        <label>Time (H:MM:SS or M:SS or seconds):</label><br />
+        <input id="time" placeholder="3:00:00" />
+
+        <br />
+
+        <label>OR Points:</label><br />
+        <input id="points" placeholder="407" />
+
+        <br /><br />
+
+        <button onclick="calculate()">Go</button>
+
+        <table id="results" style="display: none">
+            <thead>
+                <tr>
+                    <th>Distance</th>
+                    <th>Time</th>
+                    <th>Pace (min/mi)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script src="scoring.js"></script>
+
+    <script>
+        function toSeconds(t) {
+            if (!t) return null;
+            t = t.trim();
+            if (!t) return null;
+
+            // If it's just a number like "59.03"
+            if (t.indexOf(":") === -1) return parseFloat(t);
+
+            var parts = t.split(":").map(function(x) {
+                return Number(x);
+            });
+
+            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            if (parts.length === 2) return parts[0] * 60 + parts[1];
+
+            return null;
+        }
+
+        // Distance map (miles) for pace calculations
+        var eventMiles = {
+            "100m": 100 / 1609.344,
+            "200m": 200 / 1609.344,
+            "300m": 300 / 1609.344,
+            "400m": 400 / 1609.344,
+            "800m": 800 / 1609.344,
+            "mile": 1,
+            "5k": 5000 / 1609.344,
+            "10k": 10000 / 1609.344,
+            "hm": 21097.5 / 1609.344,
+            "marathon": 42195 / 1609.344
+        };
+
+        function pad2(n) {
+            return (n < 10 ? "0" : "") + n;
+        }
+
+        function formatPace(secPerMile) {
+            if (secPerMile == null || isNaN(secPerMile) || !isFinite(secPerMile)) return "-";
+            var total = Math.round(secPerMile);
+            var mins = Math.floor(total / 60);
+            var secs = total - mins * 60;
+            return mins + ":" + pad2(secs) + "/mile";
+        }
+
+        function paceForEvent(eventKey, timeStr) {
+            if (!timeStr || timeStr === "-") return "-";
+            var miles = eventMiles[eventKey];
+            if (!miles) return "-";
+            var sec = toSeconds(timeStr);
+            if (sec == null || isNaN(sec)) return "-";
+            return formatPace(sec / miles);
+        }
+
+        function findPoints(event, timeSec) {
+            var rows = scoring[event];
+            var best = null;
+
+            // Find the closest time that is <= entered time (i.e., next fastest)
+            for (var i = 0; i < rows.length; i++) {
+                var r = rows[i];
+                if (r.sec <= timeSec) {
+                    if (!best || r.sec > best.sec) best = r;
+                }
+            }
+
+            return best ? best.pts : null;
+        }
+
+        function findTime(event, pts) {
+            var rows = scoring[event];
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].pts == pts) return rows[i].time;
+            }
+            return "-";
+        }
+
+        function calculate() {
+            var dist = document.getElementById("distance").value;
+            var time = document.getElementById("time").value;
+            var pts = document.getElementById("points").value;
+
+            var points = null;
+
+            if (pts && pts.trim() !== "") {
+                points = parseInt(pts, 10);
+            } else {
+                var sec = toSeconds(time);
+                if (sec == null || isNaN(sec)) {
+                    alert("Enter a valid time or points.");
+                    return;
+                }
+                points = findPoints(dist, sec);
+            }
+
+            if (!points) {
+                alert("No match found (time might be outside the table range).");
+                return;
+            }
+
+            var tbody = document.querySelector("#results tbody");
+            tbody.innerHTML = "";
+
+            for (var ev in scoring) {
+                if (!scoring.hasOwnProperty(ev)) continue;
+                var t = findTime(ev, points);
+                var tr = document.createElement("tr");
+
+                var td1 = document.createElement("td");
+                td1.textContent = labels[ev];
+
+                var td2 = document.createElement("td");
+                td2.textContent = t;
+
+                var td3 = document.createElement("td");
+                td3.textContent = paceForEvent(ev, t);
+
+                tr.appendChild(td1);
+                tr.appendChild(td2);
+                tr.appendChild(td3);
+                tbody.appendChild(tr);
+            }
+
+            document.getElementById("results").style.display = "table";
+        }
+    </script>
+</body>
+
+</html>
