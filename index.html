@@ -357,6 +357,18 @@
         td:nth-child(3) {
             text-align: center;
         }
+        /* Training table: center the Range column (2nd col) like the Pace column above */
+        
+        #training th:nth-child(2),
+        #training td:nth-child(2),
+        #training th:nth-child(3),
+        #training td:nth-child(3),
+        #training th:nth-child(4),
+        #training td:nth-child(4),
+        #training th:nth-child(5),
+        #training td:nth-child(5) {
+            text-align: center;
+        }
         
         .pace-header {
             display: inline-flex;
@@ -484,7 +496,7 @@
 
         <div style="height: 10px;"></div>
 
-        <table id="results" style="display: none" title="Click any row to explore: use that event/time as the new input">
+        <table id="results" style="display: none">
             <thead>
                 <tr>
                     <th>Distance</th>
@@ -502,6 +514,31 @@
                         </span>
                         </span>
                     </th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <table id="training" style="display: none; margin-top: 12px;">
+            <thead>
+                <tr>
+                    <th>Training pace</th>
+                    <th>
+                        <span class="pace-header">
+                            <span>Range</span>
+                        <span class="pace-toggle" title="Toggle pace units">
+                                <span class="unit">mi</span>
+                        <label class="switch">
+                                    <input id="paceUnitToggle2" type="checkbox" aria-label="Pace unit toggle (training)" />
+                                    <span class="slider"></span>
+                                </label>
+                        <span class="unit">km</span>
+                        </span>
+                        </span>
+                    </th>
+                    <th>1k</th>
+                    <th>800m</th>
+                    <th>400m</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -574,7 +611,9 @@
             var sec = toSeconds(timeStr);
             if (sec == null || isNaN(sec)) return "-";
 
-            var unit = (document.getElementById("paceUnitToggle") && document.getElementById("paceUnitToggle").checked) ? "km" : "mi";
+            var t1 = document.getElementById("paceUnitToggle");
+            var t2 = document.getElementById("paceUnitToggle2");
+            var unit = ((t1 && t1.checked) || (t2 && t2.checked)) ? "km" : "mi";
 
             if (unit === "km") {
                 var km = eventMiles[eventKey] * 1.609344;
@@ -585,6 +624,144 @@
                 if (!miles) return "-";
                 return formatPace(sec / miles, "mile");
             }
+        }
+
+        function formatPaceValue(secPerUnit) {
+            if (secPerUnit == null || isNaN(secPerUnit) || !isFinite(secPerUnit)) return "-";
+            var total = Math.round(secPerUnit);
+            var mins = Math.floor(total / 60);
+            var secs = total - mins * 60;
+            return mins + ":" + pad2(secs);
+        }
+
+        function formatPaceRange(lowSec, highSec, unitLabel) {
+            if (lowSec == null || highSec == null) return "-";
+            var a = formatPaceValue(lowSec);
+            var b = formatPaceValue(highSec);
+            if (a === "-" || b === "-") return "-";
+            return a + "–" + b + "/" + unitLabel;
+        }
+
+        function formatRepTime(sec) {
+            if (sec == null || isNaN(sec) || !isFinite(sec)) return "-";
+            var total = Math.round(sec);
+            var mins = Math.floor(total / 60);
+            var secs = total - mins * 60;
+            return mins + ":" + pad2(secs);
+        }
+
+        function repTimeRangeFromPaceRange(lowSecPerUnit, highSecPerUnit, meters, unit) {
+            if (lowSecPerUnit == null || highSecPerUnit == null) return "-";
+            var metersPerUnit = (unit === "km") ? 1000 : 1609.344;
+            var low = (lowSecPerUnit / metersPerUnit) * meters;
+            var high = (highSecPerUnit / metersPerUnit) * meters;
+            return formatRepTime(low) + "–" + formatRepTime(high);
+        }
+
+        function paceSecPerUnitForEvent(eventKey, timeStr, unit) {
+            if (!timeStr || timeStr === "-") return null;
+            var sec = toSeconds(timeStr);
+            if (sec == null || isNaN(sec)) return null;
+
+            if (unit === "km") {
+                var km = eventMiles[eventKey] * 1.609344;
+                if (!km) return null;
+                return sec / km;
+            }
+
+            var miles = eventMiles[eventKey];
+            if (!miles) return null;
+            return sec / miles;
+        }
+
+        function updateTrainingPaces(points) {
+            var tbl = document.getElementById("training");
+            var body = document.querySelector("#training tbody");
+            body.innerHTML = "";
+
+            var t1 = document.getElementById("paceUnitToggle");
+            var t2 = document.getElementById("paceUnitToggle2");
+            var unit = ((t1 && t1.checked) || (t2 && t2.checked)) ? "km" : "mi";
+            var unitLabel = (unit === "km") ? "km" : "mile";
+
+            // Pull equivalent times for anchor events
+            var t5k = findTime("5k", points);
+            var t10k = findTime("10k", points);
+            var tHM = findTime("hm", points);
+            var tMar = findTime("marathon", points);
+
+            var p5k = paceSecPerUnitForEvent("5k", t5k, unit);
+            var p10k = paceSecPerUnitForEvent("10k", t10k, unit);
+            var pHM = paceSecPerUnitForEvent("hm", tHM, unit);
+            var pMar = paceSecPerUnitForEvent("marathon", tMar, unit);
+
+            // Fallbacks if something is missing
+            if (pMar == null) pMar = (pHM != null) ? pHM * 1.12 : null;
+            if (pHM == null) pHM = (p10k != null) ? p10k * 1.10 : null;
+            if (p10k == null) p10k = (p5k != null) ? p5k * 1.06 : null;
+
+            // Zone heuristics (simple, transparent, and useful)
+            // VO2max ~ 5k pace (very roughly), CV ~ 10k pace, Threshold between 10k and HM.
+            var vo2Low = (p5k != null) ? p5k * 0.985 : null;
+            var vo2High = (p5k != null) ? p5k * 1.02 : null;
+
+            var cvLow = (p10k != null) ? p10k * 0.99 : null;
+            var cvHigh = (p10k != null) ? p10k * 1.02 : null;
+
+            var tPace = (p10k != null && pHM != null) ? (p10k * 0.55 + pHM * 0.45) : (p10k != null ? p10k * 1.04 : null);
+            var thrLow = (tPace != null) ? tPace * 0.985 : null;
+            var thrHigh = (tPace != null) ? tPace * 1.02 : null;
+
+            // Marathon/steady/easy/recovery based off marathon-ish pace
+            var steadyLow = (pMar != null) ? pMar * 1.00 : null;
+            var steadyHigh = (pMar != null) ? pMar * 1.08 : null;
+
+            var easyLow = (pMar != null) ? pMar * 1.08 : null;
+            var easyHigh = (pMar != null) ? pMar * 1.20 : null;
+
+            var recLow = (pMar != null) ? pMar * 1.20 : null;
+            var recHigh = (pMar != null) ? pMar * 1.35 : null;
+
+            function addRow(name, low, high, includeReps) {
+                var tr = document.createElement("tr");
+
+                var a = document.createElement("td");
+                a.textContent = name;
+
+                var b = document.createElement("td");
+                b.textContent = formatPaceRange(low, high, unitLabel);
+
+                var c = document.createElement("td");
+                var d = document.createElement("td");
+                var e = document.createElement("td");
+
+                if (includeReps) {
+                    // Order: 1k, 800m, 400m
+                    c.textContent = repTimeRangeFromPaceRange(low, high, 1000, unit);
+                    d.textContent = repTimeRangeFromPaceRange(low, high, 800, unit);
+                    e.textContent = repTimeRangeFromPaceRange(low, high, 400, unit);
+                } else {
+                    c.textContent = "-";
+                    d.textContent = "-";
+                    e.textContent = "-";
+                }
+
+                tr.appendChild(a);
+                tr.appendChild(b);
+                tr.appendChild(c);
+                tr.appendChild(d);
+                tr.appendChild(e);
+                body.appendChild(tr);
+            }
+
+            addRow("Recovery", recLow, recHigh, false);
+            addRow("Easy", easyLow, easyHigh, false);
+            addRow("Steady / Long run", steadyLow, steadyHigh, false);
+            addRow("Threshold (LT2)", thrLow, thrHigh, true);
+            addRow("Critical velocity (CV)", cvLow, cvHigh, true);
+            addRow("VO₂max", vo2Low, vo2High, true);
+
+            tbl.style.display = "table";
         }
 
         function findPoints(event, timeSec) {
@@ -686,6 +863,8 @@
             }
 
             document.getElementById("results").style.display = "table";
+            // Render training pace ranges based on the same points value
+            updateTrainingPaces(points);
         }
 
         // Allow Enter/Return to trigger calculation (after functions are defined)
@@ -724,8 +903,22 @@
             updateInputWarning();
         });
 
+        function syncPaceToggles(sourceId) {
+            var a = document.getElementById("paceUnitToggle");
+            var b = document.getElementById("paceUnitToggle2");
+            if (!a || !b) return;
+            if (sourceId === "paceUnitToggle") b.checked = a.checked;
+            if (sourceId === "paceUnitToggle2") a.checked = b.checked;
+        }
+
         document.getElementById("paceUnitToggle").addEventListener("change", function() {
-            // If results are visible, re-run to refresh pace column
+            syncPaceToggles("paceUnitToggle");
+            var tbl = document.getElementById("results");
+            if (tbl && tbl.style.display !== "none") calculate();
+        });
+
+        document.getElementById("paceUnitToggle2").addEventListener("change", function() {
+            syncPaceToggles("paceUnitToggle2");
             var tbl = document.getElementById("results");
             if (tbl && tbl.style.display !== "none") calculate();
         });
