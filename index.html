@@ -30,7 +30,7 @@
             margin: 0;
             font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
             color: var(--text);
-            background: radial-gradient(1200px 800px at 20% 10%, rgba(37, 99, 235, 0.25), transparent 60%), radial-gradient(900px 700px at 90% 20%, rgba(34, 197, 94, 0.18), transparent 55%), radial-gradient(1000px 700px at 50% 110%, rgba(59, 130, 246, 0.14), transparent 55%), var(--bg);
+            background: radial-gradient(1200px 800px at 20% 10%, rgba(37, 99, 235, 0.25), transparent 60%), radial-gradient(900px 700px at 90% 20%, rgba(234, 179, 8, 0.22), transparent 55%), radial-gradient(1000px 700px at 50% 110%, rgba(59, 130, 246, 0.14), transparent 55%), var(--bg);
             min-height: 100vh;
             padding: 28px 18px;
         }
@@ -80,6 +80,72 @@
             font-size: 12px;
             white-space: nowrap;
             user-select: none;
+        }
+        /* iOS-style toggle for pace unit */
+        
+        .pace-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        
+        .pace-toggle .unit {
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.72);
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: 160ms ease;
+            border-radius: 999px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.92);
+            transition: 160ms ease;
+            border-radius: 999px;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+        }
+        
+        .switch input:checked+.slider {
+            background: rgba(37, 99, 235, 0.55);
+            border-color: rgba(37, 99, 235, 0.65);
+        }
+        
+        .switch input:checked+.slider:before {
+            transform: translate(20px, -50%);
+        }
+        
+        .switch input:focus+.slider {
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.20);
         }
         
         .grid {
@@ -201,6 +267,25 @@
             position: sticky;
             top: 0;
         }
+        /* Align numeric Time column to the right; Pace column centered */
+        
+        th:nth-child(2),
+        td:nth-child(2) {
+            text-align: right;
+        }
+        
+        th:nth-child(3),
+        td:nth-child(3) {
+            text-align: center;
+        }
+        
+        .pace-header {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
         
         tbody tr:nth-child(odd) td {
             background: rgba(255, 255, 255, 0.02);
@@ -239,7 +324,10 @@
             </div>
             <div class="pill">WA scoring • 1–1400 pts • pace in min/mi</div>
         </div>
-        <div id="summary" class="pill" style="display:none; margin-bottom: 10px;"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 10px;">
+            <div id="summary" class="pill" style="display:none;"></div>
+            <div id="inputWarning" class="pill" style="display:none; border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.10); color: rgba(255,255,255,0.82);"></div>
+        </div>
 
         <div class="grid">
             <div class="field">
@@ -279,6 +367,7 @@
                 </div>
                 <p class="hint">Tip: enter either a time or points.</p>
             </div>
+
         </div>
 
         <div class="divider"></div>
@@ -288,7 +377,19 @@
                 <tr>
                     <th>Distance</th>
                     <th>Time</th>
-                    <th>Pace (min/mi)</th>
+                    <th>
+                        <span class="pace-header">
+                            <span>Pace</span>
+                        <span class="pace-toggle" title="Toggle pace units">
+                                <span class="unit">mi</span>
+                        <label class="switch">
+                                    <input id="paceUnitToggle" type="checkbox" aria-label="Pace unit toggle" />
+                                    <span class="slider"></span>
+                                </label>
+                        <span class="unit">km</span>
+                        </span>
+                        </span>
+                    </th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -302,9 +403,14 @@
             document.getElementById("time").value = "";
             document.getElementById("points").value = "";
             document.getElementById("results").style.display = "none";
+
             var s = document.getElementById("summary");
             s.style.display = "none";
             s.textContent = "";
+
+            var w = document.getElementById("inputWarning");
+            w.style.display = "none";
+            w.textContent = "";
         }
 
         function toSeconds(t) {
@@ -343,21 +449,30 @@
             return (n < 10 ? "0" : "") + n;
         }
 
-        function formatPace(secPerMile) {
-            if (secPerMile == null || isNaN(secPerMile) || !isFinite(secPerMile)) return "-";
-            var total = Math.round(secPerMile);
+        function formatPace(secPerUnit, unitLabel) {
+            if (secPerUnit == null || isNaN(secPerUnit) || !isFinite(secPerUnit)) return "-";
+            var total = Math.round(secPerUnit);
             var mins = Math.floor(total / 60);
             var secs = total - mins * 60;
-            return mins + ":" + pad2(secs) + "/mile";
+            return mins + ":" + pad2(secs) + "/" + unitLabel;
         }
 
         function paceForEvent(eventKey, timeStr) {
             if (!timeStr || timeStr === "-") return "-";
-            var miles = eventMiles[eventKey];
-            if (!miles) return "-";
             var sec = toSeconds(timeStr);
             if (sec == null || isNaN(sec)) return "-";
-            return formatPace(sec / miles);
+
+            var unit = (document.getElementById("paceUnitToggle") && document.getElementById("paceUnitToggle").checked) ? "km" : "mi";
+
+            if (unit === "km") {
+                var km = eventMiles[eventKey] * 1.609344;
+                if (!km) return "-";
+                return formatPace(sec / km, "km");
+            } else {
+                var miles = eventMiles[eventKey];
+                if (!miles) return "-";
+                return formatPace(sec / miles, "mile");
+            }
         }
 
         function findPoints(event, timeSec) {
@@ -437,6 +552,48 @@
 
             document.getElementById("results").style.display = "table";
         }
+
+        // Allow Enter/Return to trigger calculation (after functions are defined)
+        document.getElementById("time").addEventListener("keydown", function(e) {
+            if (e.key === "Enter") calculate();
+        });
+
+        document.getElementById("points").addEventListener("keydown", function(e) {
+            if (e.key === "Enter") calculate();
+        });
+
+
+        function updateInputWarning() {
+            var timeVal = document.getElementById("time").value.trim();
+            var ptsVal = document.getElementById("points").value.trim();
+            var w = document.getElementById("inputWarning");
+
+            if (timeVal !== "" && ptsVal !== "") {
+                w.textContent = "Both Time and Points are filled — using Points and ignoring Time.";
+                w.style.display = "inline-flex";
+            } else {
+                w.style.display = "none";
+                w.textContent = "";
+            }
+        }
+
+        document.getElementById("time").addEventListener("input", function() {
+            var ptsEl = document.getElementById("points");
+            if (this.value.trim() !== "") ptsEl.value = "";
+            updateInputWarning();
+        });
+
+        document.getElementById("points").addEventListener("input", function() {
+            var timeEl = document.getElementById("time");
+            if (this.value.trim() !== "") timeEl.value = "";
+            updateInputWarning();
+        });
+
+        document.getElementById("paceUnitToggle").addEventListener("change", function() {
+            // If results are visible, re-run to refresh pace column
+            var tbl = document.getElementById("results");
+            if (tbl && tbl.style.display !== "none") calculate();
+        });
     </script>
 </body>
 
