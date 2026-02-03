@@ -239,6 +239,85 @@
             margin: 16px 0;
         }
         
+        details {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 12px;
+        }
+        
+        summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.86);
+            user-select: none;
+        }
+        
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        
+        .chev {
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: rgba(255, 255, 255, 0.78);
+            background: rgba(0, 0, 0, 0.18);
+            transition: transform 160ms ease;
+            flex: 0 0 auto;
+        }
+        
+        details[open] .chev {
+            transform: rotate(90deg);
+        }
+        
+        .about-body {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        
+        .about-body ul {
+            margin: 8px 0 0 18px;
+            padding: 0;
+        }
+        
+        .about-body li {
+            margin: 6px 0;
+        }
+        
+        .about-kv {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 8px 12px;
+            margin-top: 10px;
+        }
+        
+        .about-kv .k {
+            color: rgba(255, 255, 255, 0.78);
+        }
+        
+        .about-kv .v {
+            color: var(--muted);
+        }
+        
+        @media (max-width: 720px) {
+            .about-kv {
+                grid-template-columns: 1fr;
+            }
+        }
+        
         table {
             border-collapse: separate;
             border-spacing: 0;
@@ -293,6 +372,15 @@
         
         tbody tr:hover td {
             background: rgba(37, 99, 235, 0.12);
+        }
+        /* Clickable results rows */
+        
+        tbody tr {
+            cursor: pointer;
+        }
+        
+        tbody tr:active td {
+            transform: translateY(1px);
         }
         
         td:nth-child(2),
@@ -372,7 +460,31 @@
 
         <div class="divider"></div>
 
-        <table id="results" style="display: none">
+        <details>
+            <summary>
+                <span>About / Data</span>
+                <span class="chev">›</span>
+            </summary>
+            <div class="about-body">
+                <div class="about-kv">
+                    <div class="k">Scoring table</div>
+                    <div class="v">World Athletics Scoring Tables (2025 edition)</div>
+
+                    <div class="k">Method</div>
+                    <div class="v">All events are mapped to the same points value, then the matching time for each event is displayed.</div>
+
+                    <div class="k">Missing cells</div>
+                    <div class="v">If a specific event has a “-” at a given points value, this tool uses the next faster available time (from the next higher points row).</div>
+
+                    <div class="k">Disclaimer</div>
+                    <div class="v">These equivalences are scoring-based comparisons, not physiology-based predictions. Individual strengths (speed vs endurance), course, weather, and training can shift real-world equivalence.</div>
+                </div>
+            </div>
+        </details>
+
+        <div style="height: 10px;"></div>
+
+        <table id="results" style="display: none" title="Click any row to explore: use that event/time as the new input">
             <thead>
                 <tr>
                     <th>Distance</th>
@@ -498,6 +610,21 @@
             return "-";
         }
 
+        function applyFromRow(evKey, timeStr) {
+            if (!timeStr || timeStr === "-") return;
+
+            // Set inputs: choose event, set time, clear points
+            document.getElementById("distance").value = evKey;
+            document.getElementById("time").value = timeStr;
+            document.getElementById("points").value = "";
+
+            // Hide any warnings (auto-clear behavior keeps things clean)
+            updateInputWarning();
+
+            // Recalculate based on the clicked event/time
+            calculate();
+        }
+
         function calculate() {
             var dist = document.getElementById("distance").value;
             var time = document.getElementById("time").value;
@@ -547,6 +674,14 @@
                 tr.appendChild(td1);
                 tr.appendChild(td2);
                 tr.appendChild(td3);
+
+                // Click a row to use that event/time as the new input
+                (function(clickedEv, clickedTime) {
+                    tr.addEventListener("click", function() {
+                        applyFromRow(clickedEv, clickedTime);
+                    });
+                })(ev, t);
+
                 tbody.appendChild(tr);
             }
 
