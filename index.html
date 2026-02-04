@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Race Equivalent Calculator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Race Equivalent & Pace Calculator</title>
 
     <style>
          :root {
@@ -78,8 +79,14 @@
             background: rgba(255, 255, 255, 0.06);
             color: var(--muted);
             font-size: 12px;
-            white-space: nowrap;
+            white-space: normal;
+            max-width: 100%;
+            word-break: break-word;
             user-select: none;
+        }
+        
+        .pill--nowrap {
+            white-space: nowrap;
         }
         /* iOS-style toggle for pace unit */
         
@@ -328,6 +335,28 @@
             border: 1px solid var(--border);
             background: rgba(255, 255, 255, 0.04);
         }
+        /* Mobile-friendly table wrapper (horizontal scroll instead of squishing) */
+        
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 14px;
+        }
+        
+        .table-wrap table {
+            margin-top: 0;
+        }
+        /* Give tables a sensible minimum width so columns don't collapse */
+        
+        #results {
+            min-width: 640px;
+        }
+        
+        #training,
+        #track {
+            min-width: 760px;
+        }
         
         th,
         td {
@@ -419,9 +448,40 @@
             .pill {
                 display: none;
             }
+            /* Keep the dynamic pills readable on mobile */
+            #summary,
+            #inputWarning {
+                display: inline-flex;
+                flex: 1 1 100%;
+                width: 100%;
+                white-space: normal;
+                justify-content: flex-start;
+            }
+            body {
+                padding: 16px 12px;
+            }
+            .container {
+                padding: 16px;
+                border-radius: 14px;
+            }
+            .title {
+                font-size: 18px;
+            }
+            .subtitle {
+                font-size: 13px;
+            }
+            .field {
+                padding: 10px;
+            }
+            select,
+            input {
+                font-size: 16px;
+                /* prevents iOS zoom + improves readability */
+            }
             th,
             td {
-                padding: 10px;
+                padding: 9px 10px;
+                font-size: 12px;
             }
         }
     </style>
@@ -434,7 +494,7 @@
                 <h2 class="title">Race Equivalent Calculator</h2>
                 <p class="subtitle">Convert a race time (or points) into equivalent performances across events using World Athletics scoring tables.</p>
             </div>
-            <div class="pill">WA scoring • 1–1400 pts • pace in min/mi</div>
+            <div class="pill pill--nowrap">WA scoring • 1–1400 pts • pace in min/mi</div>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 10px;">
             <div id="summary" class="pill" style="display:none;"></div>
@@ -508,67 +568,73 @@
 
         <div style="height: 10px;"></div>
 
-        <table id="results" style="display: none">
-            <thead>
-                <tr>
-                    <th>Distance</th>
-                    <th>Time</th>
-                    <th>
-                        <span class="pace-header">
-                            <span>Pace</span>
-                        <span class="pace-toggle" title="Toggle pace units">
-                                <span class="unit">mi</span>
-                        <label class="switch">
-                                    <input id="paceUnitToggle" type="checkbox" aria-label="Pace unit toggle" />
-                                    <span class="slider"></span>
-                                </label>
-                        <span class="unit">km</span>
-                        </span>
-                        </span>
-                    </th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <div class="table-wrap">
+            <table id="results" style="display: none">
+                <thead>
+                    <tr>
+                        <th>Distance</th>
+                        <th>Time</th>
+                        <th>
+                            <span class="pace-header">
+                                <span>Pace</span>
+                            <span class="pace-toggle" title="Toggle pace units">
+                                    <span class="unit">mi</span>
+                            <label class="switch">
+                                        <input id="paceUnitToggle" type="checkbox" aria-label="Pace unit toggle" />
+                                        <span class="slider"></span>
+                                    </label>
+                            <span class="unit">km</span>
+                            </span>
+                            </span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
 
-        <table id="training" style="display: none; margin-top: 12px;">
-            <thead>
-                <tr>
-                    <th>Training pace</th>
-                    <th>
-                        <span class="pace-header">
-                            <span>Range</span>
-                        <span class="pace-toggle" title="Toggle pace units">
-                                <span class="unit">mi</span>
-                        <label class="switch">
-                                    <input id="paceUnitToggle2" type="checkbox" aria-label="Pace unit toggle (training)" />
-                                    <span class="slider"></span>
-                                </label>
-                        <span class="unit">km</span>
-                        </span>
-                        </span>
-                    </th>
-                    <th>1k</th>
-                    <th>800m</th>
-                    <th>400m</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <div class="table-wrap" style="margin-top: 12px;">
+            <table id="training" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Training pace</th>
+                        <th>
+                            <span class="pace-header">
+                                <span>Range</span>
+                            <span class="pace-toggle" title="Toggle pace units">
+                                    <span class="unit">mi</span>
+                            <label class="switch">
+                                        <input id="paceUnitToggle2" type="checkbox" aria-label="Pace unit toggle (training)" />
+                                        <span class="slider"></span>
+                                    </label>
+                            <span class="unit">km</span>
+                            </span>
+                            </span>
+                        </th>
+                        <th>1k</th>
+                        <th>800m</th>
+                        <th>400m</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
 
-        <table id="track" style="display: none; margin-top: 12px;">
-            <thead>
-                <tr>
-                    <th>Track effort</th>
-                    <th>Use</th>
-                    <th>Split range</th>
-                    <th>400m</th>
-                    <th>200m</th>
-                    <th>100m</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <div class="table-wrap" style="margin-top: 12px;">
+            <table id="track" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Track effort</th>
+                        <th>Use</th>
+                        <!-- <th>Split range</th> -->
+                        <th>400m</th>
+                        <th>200m</th>
+                        <th>100m</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 
     <script src="scoring.js"></script>
@@ -729,12 +795,14 @@
             if (p10k == null) p10k = (p5k != null) ? p5k * 1.06 : null;
 
             // Zone heuristics (simple, transparent, and useful)
-            // VO2max ~ 5k pace (very roughly), CV ~ 10k pace, Threshold between 10k and HM.
+            // VO2max ~ 5k pace (very roughly), CV ~ slightly slower than 5k pace (track “strength” reps), Threshold between 10k and HM.
             var vo2Low = (p5k != null) ? p5k * 0.985 : null;
             var vo2High = (p5k != null) ? p5k * 1.02 : null;
 
-            var cvLow = (p10k != null) ? p10k * 0.99 : null;
-            var cvHigh = (p10k != null) ? p10k * 1.02 : null;
+            // CV: many runners use this around ~5k pace + ~3–6% (roughly 10–20s/mi at typical 5k paces)
+            // We anchor to 5k pace for better real-world “track rep” usefulness.
+            var cvLow = (p5k != null) ? p5k * 1.03 : ((p10k != null) ? p10k * 0.98 : null);
+            var cvHigh = (p5k != null) ? p5k * 1.06 : ((p10k != null) ? p10k * 1.01 : null);
 
             var tPace = (p10k != null && pHM != null) ? (p10k * 0.55 + pHM * 0.45) : (p10k != null ? p10k * 1.04 : null);
             var thrLow = (tPace != null) ? tPace * 0.985 : null;
@@ -856,7 +924,7 @@
 
                 tr.appendChild(a);
                 tr.appendChild(b);
-                tr.appendChild(c);
+                // tr.appendChild(c);
                 tr.appendChild(d);
                 tr.appendChild(e);
                 tr.appendChild(f);
@@ -864,13 +932,13 @@
             }
 
             // 3k–5k-ish (track aerobic) — based on 5k pace
-            // addRow(
-            //     "3k–5k effort",
-            //     "Cruise reps (e.g., 6×1k, 12×400) / strength-endurance",
-            //     0.99,
-            //     1.03,
-            //     (s5k != null && !isNaN(s5k)) ? splitSecPerMeter(s5k, 5000) : null
-            // );
+            addRow(
+                "3k–5k effort",
+                "Cruise reps (e.g., 6×1k, 12×400) / strength-endurance",
+                0.99,
+                1.03,
+                (s5k != null && !isNaN(s5k)) ? splitSecPerMeter(s5k, 5000) : null
+            );
 
             // Mile/1500 effort — based on mile pace
             addRow(
