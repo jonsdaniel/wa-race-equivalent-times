@@ -357,6 +357,51 @@
         #track {
             min-width: 760px;
         }
+        /* Desktop-friendly results layout: balanced columns and consistent left alignment */
+        
+        #results {
+            table-layout: fixed;
+        }
+        
+        #results th:nth-child(1),
+        #results td:nth-child(1),
+        #results th:nth-child(2),
+        #results td:nth-child(2),
+        #results th:nth-child(3),
+        #results td:nth-child(3) {
+            width: 33.333%;
+            white-space: nowrap;
+        }
+        /* Let distance wrap if needed */
+        
+        #results th:nth-child(1),
+        #results td:nth-child(1) {
+            white-space: normal;
+        }
+        /* Desktop-friendly training layout: reduce odd gaps, keep columns visually even */
+        
+        #training {
+            table-layout: fixed;
+        }
+        
+        #training th:nth-child(1),
+        #training td:nth-child(1) {
+            width: 30%;
+        }
+        
+        #training th:nth-child(2),
+        #training td:nth-child(2) {
+            width: 26%;
+        }
+        
+        #training th:nth-child(3),
+        #training td:nth-child(3),
+        #training th:nth-child(4),
+        #training td:nth-child(4),
+        #training th:nth-child(5),
+        #training td:nth-child(5) {
+            width: 14.666%;
+        }
         
         th,
         td {
@@ -375,21 +420,19 @@
             position: sticky;
             top: 0;
         }
-        /* Align numeric Time column to the right; Pace column centered */
+        /* Results table default alignment (desktop): keep everything left-aligned for even spacing */
         
-        th:nth-child(2),
-        td:nth-child(2) {
-            text-align: right;
+        #results th,
+        #results td {
+            text-align: left;
         }
-        
-        th:nth-child(3),
-        td:nth-child(3) {
-            text-align: center;
-        }
-        /* Training table: center the Range column and rep columns */
+        /* Training table: Range left-aligned; rep columns centered */
         
         #training th:nth-child(2),
-        #training td:nth-child(2),
+        #training td:nth-child(2) {
+            text-align: left;
+        }
+        
         #training th:nth-child(3),
         #training td:nth-child(3),
         #training th:nth-child(4),
@@ -410,13 +453,70 @@
         #track td:nth-child(6) {
             text-align: center;
         }
+        /* Track table: description column left-aligned */
+        
+        #track th:nth-child(2),
+        #track td:nth-child(2) {
+            text-align: left;
+        }
         
         .pace-header {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 10px;
-            width: 100%;
+            width: auto;
+        }
+        /* @media (min-width: 721px) {
+            body {
+                font-size: 16px;
+                zoom: 1.15;
+            }
+            .title {
+                font-size: 24px;
+            }
+            .subtitle {
+                font-size: 14px;
+            }
+            select,
+            input {
+                font-size: 15px;
+                padding: 12px 14px;
+            }
+            th,
+            td {
+                padding: 12px 14px;
+                font-size: 14px;
+            }
+            .pill {
+                font-size: 13px;
+            }
+        } */
+        
+        @media (min-width: 721px) {
+            body {
+                font-size: 16px;
+                zoom: 1.2;
+            }
+            .title {
+                font-size: 24px;
+            }
+            .subtitle {
+                font-size: 14px;
+            }
+            select,
+            input {
+                font-size: 15px;
+                padding: 12px 14px;
+            }
+            th,
+            td {
+                padding: 12px 14px;
+                font-size: 14px;
+            }
+            .pill {
+                font-size: 13px;
+            }
         }
         
         tbody tr:nth-child(odd) td {
@@ -448,6 +548,15 @@
             .pill {
                 display: none;
             }
+            /* Slightly brighter / higher-contrast theme on mobile */
+             :root {
+                --card: rgba(255, 255, 255, 0.10);
+                --muted: rgba(255, 255, 255, 0.78);
+                --border: rgba(255, 255, 255, 0.18);
+            }
+            body {
+                font-size: 16px;
+            }
             /* Keep the dynamic pills readable on mobile */
             #summary,
             #inputWarning {
@@ -465,10 +574,11 @@
                 border-radius: 14px;
             }
             .title {
-                font-size: 18px;
+                font-size: 20px;
             }
             .subtitle {
-                font-size: 13px;
+                font-size: 14px;
+                line-height: 1.45;
             }
             .field {
                 padding: 10px;
@@ -480,8 +590,143 @@
             }
             th,
             td {
-                padding: 9px 10px;
-                font-size: 12px;
+                padding: 8px 9px;
+                font-size: 13px;
+            }
+            /* Let the main results table fit phone width (no horizontal scroll) */
+            #results {
+                min-width: 0;
+            }
+            /* Tighten results table spacing a bit more than other tables */
+            #results th,
+            #results td {
+                padding: 7px 4px;
+                font-size: 13px;
+            }
+            /* Reduce header letter spacing on mobile for better fit */
+            #results th {
+                letter-spacing: 0.05em;
+            }
+            /* Make results columns fit: Distance | Time | Pace (tighter on mobile) */
+            #results th:nth-child(1),
+            #results td:nth-child(1) {
+                width: 40%;
+            }
+            #results th:nth-child(2),
+            #results td:nth-child(2),
+            #results th:nth-child(3),
+            #results td:nth-child(3) {
+                width: 30%;
+            }
+            /* Results header: prevent TIME/PACE overlap */
+            #results th:nth-child(2) {
+                padding-right: 4px;
+            }
+            #results th:nth-child(3) {
+                padding-left: 4px;
+            }
+            /* Give the left-most column a bit more breathing room on mobile */
+            #results th:nth-child(1),
+            #results td:nth-child(1) {
+                padding-left: 10px;
+            }
+            #training th:nth-child(1),
+            #training td:nth-child(1) {
+                padding-left: 10px;
+            }
+            /* Tighten Range column padding so it doesn't look overly wide */
+            #training th:nth-child(2),
+            #training td:nth-child(2) {
+                padding-left: 4px;
+                padding-right: 4px;
+            }
+            #results .pace-header {
+                width: auto;
+                /* don't force 100% */
+                justify-content: flex-end;
+                gap: 6px;
+            }
+            #results .pace-toggle {
+                margin-left: 0;
+            }
+            /* On very small widths, hide the 'Pace' label and keep only the toggle */
+            #results thead th:nth-child(3)>.pace-header>span:first-child {
+                display: inline;
+            }
+            /* Left-justify results values on mobile (easier to scan) */
+            #results tbody td:nth-child(2),
+            #results tbody td:nth-child(3) {
+                text-align: left;
+            }
+            /* Keep headers aligned and spaced */
+            #results thead th:nth-child(2),
+            #results thead th:nth-child(3) {
+                text-align: left;
+            }
+            #results .pace-toggle .unit {
+                display: none;
+            }
+            #results .switch {
+                width: 36px;
+                height: 20px;
+            }
+            #results .slider:before {
+                width: 14px;
+                height: 14px;
+                left: 3px;
+            }
+            #results .switch input:checked+.slider:before {
+                transform: translate(14px, -50%);
+            }
+            #training th,
+            #training td {
+                padding: 7px 4px;
+                font-size: 13px;
+            }
+            /* Keep columns from spreading out on mobile */
+            #training {
+                table-layout: fixed;
+            }
+            #training th:nth-child(1),
+            #training td:nth-child(1) {
+                width: 20%;
+            }
+            #training th:nth-child(2),
+            #training td:nth-child(2) {
+                width: 20%;
+            }
+            #training th:nth-child(3),
+            #training td:nth-child(3),
+            #training th:nth-child(4),
+            #training td:nth-child(4),
+            #training th:nth-child(5),
+            #training td:nth-child(5) {
+                width: 10%;
+            }
+            /* Hide MI/KM text in training header too */
+            #training .pace-toggle .unit {
+                display: none;
+            }
+            /* Slightly smaller toggle in training header */
+            #training .switch {
+                width: 36px;
+                height: 20px;
+            }
+            #training .slider:before {
+                width: 14px;
+                height: 14px;
+                left: 3px;
+            }
+            #training .switch input:checked+.slider:before {
+                transform: translate(14px, -50%);
+            }
+            /* Tighten header spacing */
+            #training thead th:nth-child(2) .pace-header {
+                gap: 4px;
+            }
+            #training .pace-toggle {
+                gap: 6px;
+                margin-left: 4px;
             }
         }
     </style>
@@ -521,13 +766,13 @@
 
             <div class="field">
                 <label for="time">Time</label>
-                <input id="time" placeholder="3:00:00" />
+                <input id="time" placeholder="1:29:59" inputmode="decimal" autocomplete="off" />
                 <p class="hint">Formats: H:MM:SS, M:SS(.xx), or seconds.</p>
             </div>
 
             <div class="field">
                 <label for="points">Points</label>
-                <input id="points" placeholder="407" />
+                <input id="points" placeholder="287" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
                 <p class="hint">If points is filled, time is ignored.</p>
             </div>
 
@@ -1109,14 +1354,39 @@
         }
 
         document.getElementById("time").addEventListener("input", function() {
+            // Allow race-time formats: H:MM:SS, M:SS(.xx), or raw seconds
+            // Keep only digits, colon, and dot
+            var v = this.value;
+            v = v.replace(/[^0-9:.]/g, "");
+
+            // Only allow up to 2 colons total (H:MM:SS)
+            var parts = v.split(":");
+            if (parts.length > 3) {
+                parts = parts.slice(0, 3);
+                v = parts.join(":");
+            }
+
+            // Only allow a single dot total (for fractional seconds)
+            var firstDot = v.indexOf(".");
+            if (firstDot !== -1) {
+                v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
+            }
+
+            this.value = v;
+
             var ptsEl = document.getElementById("points");
             if (this.value.trim() !== "") ptsEl.value = "";
+
             updateInputWarning();
         });
 
         document.getElementById("points").addEventListener("input", function() {
+            // Keep points digits-only
+            this.value = this.value.replace(/[^0-9]/g, "");
+
             var timeEl = document.getElementById("time");
             if (this.value.trim() !== "") timeEl.value = "";
+
             updateInputWarning();
         });
 
