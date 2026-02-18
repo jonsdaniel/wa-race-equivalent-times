@@ -353,7 +353,8 @@
         }
         /* Give tables a sensible minimum width so columns don't collapse */
         
-        #results {
+        #results,
+        #pft {
             min-width: 640px;
         }
         
@@ -601,6 +602,9 @@
             #results {
                 min-width: 0;
             }
+            #pft {
+                min-width: 0;
+            }
             /* Tighten results table spacing a bit more than other tables */
             #results th,
             #results td {
@@ -760,6 +764,7 @@
       <option value="400m">400m</option>
       <option value="800m">800m</option>
       <option value="mile">1 mile (road)</option>
+      <!-- <option value="2mile">2 mile</option> -->
       <option value="5k">5 km (road)</option>
       <option value="10k">10 km (road)</option>
       <option value="hm">Half Marathon</option>
@@ -884,9 +889,41 @@
                 <tbody></tbody>
             </table>
         </div>
+
+        <div class="table-wrap" style="margin-top: 12px;">
+            <table id="pft" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Military / PFT distances (estimated)</th>
+                        <th>Time</th>
+                        <th>
+                            <span class="pace-header">
+            <span>Pace</span>
+                            <span class="pace-toggle" title="Toggle pace units">
+              <span class="unit">mi</span>
+                            <label class="switch">
+                <input id="paceUnitToggle3" type="checkbox" aria-label="Pace unit toggle (PFT)" />
+                <span class="slider"></span>
+              </label>
+                            <span class="unit">km</span>
+                            </span>
+                            </span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 
     <script src="scoring.js"></script>
+
+    <script>
+        // Ensure labels exist for optional events
+        if (typeof labels === "object" && labels) {
+            if (!labels["2mile"]) labels["2mile"] = "2 mile";
+        }
+    </script>
 
     <script>
         function clearInputs() {
@@ -894,6 +931,7 @@
             document.getElementById("points").value = "";
             document.getElementById("results").style.display = "none";
             document.getElementById("training").style.display = "none";
+            document.getElementById("pft").style.display = "none";
             document.getElementById("track").style.display = "none";
 
             var s = document.getElementById("summary");
@@ -931,6 +969,7 @@
             "400m": 400 / 1609.344,
             "800m": 800 / 1609.344,
             "mile": 1,
+            "2mile": 2,
             "5k": 5000 / 1609.344,
             "10k": 10000 / 1609.344,
             "hm": 21097.5 / 1609.344,
@@ -1028,6 +1067,7 @@
             var unitLabel = (unit === "km") ? "km" : "mile";
 
             // Pull equivalent times for anchor events
+            var tMile = findTime("mile", points);
             var t5k = findTime("5k", points);
             var t10k = findTime("10k", points);
             var tHM = findTime("hm", points);
@@ -1043,10 +1083,57 @@
             if (pHM == null) pHM = (p10k != null) ? p10k * 1.10 : null;
             if (p10k == null) p10k = (p5k != null) ? p5k * 1.06 : null;
 
+            // --- Estimate ~12-minute all-out effort pace ("VO2-style" training anchor) ---
+            // We fit a simple power-law (Riegel-style) exponent per runner using mile + 5k,
+            // then solve for distance covered in 12 minutes (720s). This scales well from
+            // slower recreational runners to elites.
+
+            var sMile = toSeconds(tMile);
+            var s5kSec = toSeconds(t5k);
+            var kExp = null;
+
+            if (sMile != null && !isNaN(sMile) && s5kSec != null && !isNaN(s5kSec) && sMile > 0 && s5kSec > 0) {
+                // k = ln(T2/T1) / ln(D2/D1)
+                kExp = Math.log(s5kSec / sMile) / Math.log(5000 / 1609.344);
+                // Guardrails: keep k in a reasonable band to avoid weirdness from table gaps
+                if (!isFinite(kExp) || kExp < 1.03 || kExp > 1.12) kExp = null;
+            }
+
+            // If we can't fit k from mile+5k, use a sensible default (works well for most runners)
+            if (kExp == null) kExp = 1.06;
+
+            // Use the best available anchor time to solve for 12-min distance
+            var anchorDistM = null;
+            var anchorTimeS = null;
+
+            if (s5kSec != null && !isNaN(s5kSec) && s5kSec > 0) {
+                anchorDistM = 5000;
+                anchorTimeS = s5kSec;
+            } else {
+                var s10kSec = toSeconds(t10k);
+                if (s10kSec != null && !isNaN(s10kSec) && s10kSec > 0) {
+                    anchorDistM = 10000;
+                    anchorTimeS = s10kSec;
+                }
+            }
+
+            var p12 = null; // seconds per selected unit (mi or km)
+            if (anchorDistM != null && anchorTimeS != null) {
+                // Solve: 720 = T_anchor * (D12 / D_anchor)^k  =>  D12 = D_anchor * (720 / T_anchor)^(1/k)
+                var d12m = anchorDistM * Math.pow(720 / anchorTimeS, 1 / kExp);
+                if (isFinite(d12m) && d12m > 0) {
+                    if (unit === "km") {
+                        p12 = 720 / (d12m / 1000);
+                    } else {
+                        p12 = 720 / (d12m / 1609.344);
+                    }
+                }
+            }
+
             // Zone heuristics (simple, transparent, and useful)
-            // VO2max ~ 5k pace (very roughly), CV ~ slightly slower than 5k pace (track “strength” reps), Threshold between 10k and HM.
-            var vo2Low = (p5k != null) ? p5k * 0.985 : null;
-            var vo2High = (p5k != null) ? p5k * 1.02 : null;
+            // VO2 intervals anchored to ~12-min all-out effort pace (scales across ability levels)
+            var vo2Low = (p12 != null) ? p12 * 0.99 : null;
+            var vo2High = (p12 != null) ? p12 * 1.02 : null;
 
             // CV: many runners use this around ~5k pace + ~3–6% (roughly 10–20s/mi at typical 5k paces)
             // We anchor to 5k pace for better real-world “track rep” usefulness.
@@ -1105,6 +1192,140 @@
             addRow("Threshold (LT2)", thrLow, thrHigh, true);
             addRow("Critical velocity (CV)", cvLow, cvHigh, true);
             addRow("VO₂max", vo2Low, vo2High, true);
+
+            tbl.style.display = "table";
+        }
+
+        function updatePftTable(points) {
+            var tbl = document.getElementById("pft");
+            var body = document.querySelector("#pft tbody");
+            body.innerHTML = "";
+
+            var t1 = document.getElementById("paceUnitToggle");
+            var t2 = document.getElementById("paceUnitToggle2");
+            var t3 = document.getElementById("paceUnitToggle3");
+            var unit = ((t1 && t1.checked) || (t2 && t2.checked) || (t3 && t3.checked)) ? "km" : "mi";
+
+            // WA-equivalent anchors at same points
+            var tMile = findTime("mile", points);
+            var t5k = findTime("5k", points);
+            var t10k = findTime("10k", points);
+
+            var sMile = toSeconds(tMile);
+            var s5k = toSeconds(t5k);
+            var s10k = toSeconds(t10k);
+
+            // Fit distance-appropriate exponents so estimates track WA-style relationships better.
+            // kShort: mile -> 5k (interpolation in the 1–5k region)
+            // kLong:  5k  -> 10k (interpolation/extrapolation beyond 5k)
+
+            var kShort = null;
+            if (sMile != null && !isNaN(sMile) && s5k != null && !isNaN(s5k) && sMile > 0 && s5k > 0) {
+                kShort = Math.log(s5k / sMile) / Math.log(5000 / 1609.344);
+                if (!isFinite(kShort) || kShort < 1.03 || kShort > 1.12) kShort = null;
+            }
+            if (kShort == null) kShort = 1.06;
+
+            var kLong = null;
+            if (s5k != null && !isNaN(s5k) && s10k != null && !isNaN(s10k) && s5k > 0 && s10k > 0) {
+                kLong = Math.log(s10k / s5k) / Math.log(10000 / 5000);
+                if (!isFinite(kLong) || kLong < 1.03 || kLong > 1.12) kLong = null;
+            }
+            // If we don't have 10k, fall back to kShort (keeps behavior stable)
+            if (kLong == null) kLong = kShort;
+
+            function hasVal(x) {
+                return x != null && !isNaN(x) && isFinite(x) && x > 0;
+            }
+
+            function pickAnchorFor(distM) {
+                // Prefer the closest bracket: <=~5k uses 5k/mile; >~5k uses 10k/5k.
+                // This keeps 5-mile closer to the WA 10k relationship instead of being pulled by the 5k.
+
+                // If we're above 5k and have a 10k time, anchor off 10k.
+                if (distM > 5000 && hasVal(s10k)) {
+                    return {
+                        dist: 10000,
+                        time: s10k,
+                        k: kLong
+                    };
+                }
+
+                // Otherwise anchor off 5k if available (works well for 1.5/2/3mi).
+                if (hasVal(s5k)) {
+                    return {
+                        dist: 5000,
+                        time: s5k,
+                        k: kShort
+                    };
+                }
+
+                // Otherwise anchor off mile if available.
+                if (hasVal(sMile)) {
+                    return {
+                        dist: 1609.344,
+                        time: sMile,
+                        k: kShort
+                    };
+                }
+
+                return null;
+            }
+
+            function estimateTimeForMeters(distM) {
+                var a = pickAnchorFor(distM);
+                if (!a) return null;
+                return a.time * Math.pow(distM / a.dist, a.k);
+            }
+
+            function addRow(label, distM, waEventKey) {
+                var timeStr = "-";
+
+                // Use WA table for 2 mile if present
+                if (waEventKey) {
+                    var waT = findTime(waEventKey, points);
+                    if (waT && waT !== "-") timeStr = waT;
+                }
+
+                // Otherwise estimate
+                if (timeStr === "-") {
+                    var estS = estimateTimeForMeters(distM);
+                    if (estS != null && isFinite(estS)) timeStr = formatRepTime(estS);
+                }
+
+                var tr = document.createElement("tr");
+
+                var td1 = document.createElement("td");
+                td1.textContent = label;
+
+                var td2 = document.createElement("td");
+                td2.textContent = timeStr;
+
+                var td3 = document.createElement("td");
+                var sec = toSeconds(timeStr);
+
+                if (sec == null || isNaN(sec)) {
+                    td3.textContent = "-";
+                } else {
+                    if (unit === "km") {
+                        var km = distM / 1000;
+                        td3.textContent = formatPace(sec / km, "km");
+                    } else {
+                        var miles = distM / 1609.344;
+                        td3.textContent = formatPace(sec / miles, "mile");
+                    }
+                }
+
+                tr.appendChild(td1);
+                tr.appendChild(td2);
+                tr.appendChild(td3);
+                body.appendChild(tr);
+            }
+
+            addRow("1.5 mile", 1.5 * 1609.344, null);
+            addRow("2 mile", 2 * 1609.344, "2mile");
+            addRow("3 mile", 3 * 1609.344, null);
+            addRow("5 mile", 5 * 1609.344, null);
 
             tbl.style.display = "table";
         }
@@ -1230,21 +1451,22 @@
 
         function findPoints(event, timeSec) {
             var rows = scoring[event];
-            var best = null;
+            if (!rows || !rows.length) return null;
 
-            // Find the closest time that is <= entered time (i.e., next fastest)
+            var best = null;
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i];
                 if (r.sec <= timeSec) {
                     if (!best || r.sec > best.sec) best = r;
                 }
             }
-
             return best ? best.pts : null;
         }
 
         function findTime(event, pts) {
             var rows = scoring[event];
+            if (!rows || !rows.length) return "-";
+
             for (var i = 0; i < rows.length; i++) {
                 if (rows[i].pts == pts) return rows[i].time;
             }
@@ -1329,6 +1551,8 @@
             document.getElementById("results").style.display = "table";
             // Render training pace ranges based on the same points value
             updateTrainingPaces(points);
+            // Render PFT 
+            updatePftTable(points);
             // Render track-oriented split guidance based on the same points value
             updateTrackPaces(points);
         }
@@ -1340,6 +1564,12 @@
 
         document.getElementById("points").addEventListener("keydown", function(e) {
             if (e.key === "Enter") calculate();
+        });
+
+        document.getElementById("paceUnitToggle3").addEventListener("change", function() {
+            syncPaceToggles("paceUnitToggle3");
+            var tbl = document.getElementById("results");
+            if (tbl && tbl.style.display !== "none") calculate();
         });
 
 
@@ -1397,9 +1627,21 @@
         function syncPaceToggles(sourceId) {
             var a = document.getElementById("paceUnitToggle");
             var b = document.getElementById("paceUnitToggle2");
-            if (!a || !b) return;
-            if (sourceId === "paceUnitToggle") b.checked = a.checked;
-            if (sourceId === "paceUnitToggle2") a.checked = b.checked;
+            var c = document.getElementById("paceUnitToggle3");
+            if (!a || !b || !c) return;
+
+            if (sourceId === "paceUnitToggle") {
+                b.checked = a.checked;
+                c.checked = a.checked;
+            }
+            if (sourceId === "paceUnitToggle2") {
+                a.checked = b.checked;
+                c.checked = b.checked;
+            }
+            if (sourceId === "paceUnitToggle3") {
+                a.checked = c.checked;
+                b.checked = c.checked;
+            }
         }
 
         document.getElementById("paceUnitToggle").addEventListener("change", function() {
